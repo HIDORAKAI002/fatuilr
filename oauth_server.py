@@ -17,8 +17,6 @@ CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI")
 
-# --- END OF HTML TEMPLATES ---
-
 @app.route("/")
 def index():
     return "OAuth server is running. Use /login to link your role."
@@ -28,7 +26,7 @@ def login():
     # We add 'offline' to the scope to get a refresh_token
     scope = "identify role_connections.write offline"
     return redirect(
-        f"https://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}&prompt=consent"
+        f"httpss://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}&prompt=consent"
     )
 
 @app.route("/discord-oauth-callback")
@@ -46,7 +44,7 @@ def callback():
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
-    token_response = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
+    token_response = requests.post("httpss://discord.com/api/oauth2/token", data=data, headers=headers)
     tokens = token_response.json()
 
     if "access_token" not in tokens or "refresh_token" not in tokens:
@@ -57,7 +55,7 @@ def callback():
     refresh_token = tokens['refresh_token']
     expires_in = tokens['expires_in']
 
-    user_response = requests.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {access_token}"})
+    user_response = requests.get("httpss://discord.com/api/users/@me", headers={"Authorization": f"Bearer {access_token}"})
     user = user_response.json()
     user_id = int(user["id"])
 
@@ -70,4 +68,4 @@ def callback():
     if was_role_granted:
         return f"✅ Success! Your roles have been linked, {user['username']}. You can now close this tab."
     else:
-        return f"❌ Verification Failed. Sybau lil bro dont even try. You can close this tab and cry about it."
+        return f"❌ Verification Failed. You do not have any of the required roles in the server. You can close this tab."
