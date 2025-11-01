@@ -5,7 +5,8 @@ import asyncio
 from flask import Flask, request, redirect
 from dotenv import load_dotenv
 from storage import store_discord_tokens
-from discord_bot import push_role_metadata
+# UPDATED: Import the bot object as well
+from discord_bot import push_role_metadata, bot
 
 load_dotenv()
 
@@ -47,21 +48,39 @@ FAILURE_HTML = """
     <meta charset="UTF-8">
     <title>Verification Failed</title>
     <style>
-        body { background-color: #2c2f33; color: #ffffff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; display: grid; place-items: center; min-height: 90vh; }
-        .container { background-color: #36393f; padding: 40px; border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); text-align: center; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: #1e1f22;
+            /* https://cdn.discordapp.com/attachments/1412117348181213194/1434295278772551700/f-u-middle-finger.png?ex=6907cf12&is=69067d92&hm=1d15131a58e1666123bb226b88cee7cbf79f8307c4464e81fd0f75c0fe4376f0& */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('YOUR_IMAGE_URL_HERE');
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            
+            /* Center the text container */
+            display: grid;
+            place-items: center;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #ffffff;
+        }
+        .container { 
+            background-color: rgba(44, 47, 51, 0.8); /* Semi-transparent container */
+            padding: 40px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3); 
+            text-align: center; 
+        }
         h1 { color: #F44336; }
-        video { max-width: 100%; border-radius: 8px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <video src="https://cdn.discordapp.com/attachments/1412117348181213194/1434288938998042684/cat-laughing-video-meme-download.mp4?ex=6907c92a&is=690677aa&hm=3f63516a45a2fc3904b08b83f63ad3195768e5332575e593b549e4bbff9385b9&" width="350" loop controls>
-            Your browser does not support the video tag.
-        </video>
-        
         <h1>❌ Verification Failed</h1>
-        <p>Sybau bro don't even try.</p>
-        <p>You can close this tab and cry about it.</p>
+        <p>You do not have any of the required roles in the server.</p>
+        <p>You can close this tab.</p>
     </div>
 </body>
 </html>
@@ -78,7 +97,7 @@ def index():
 def login():
     scope = "identify role_connections.write"
     return redirect(
-        f"https://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}"
+        f"httpsS://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}"
     )
 
 @app.route("/discord-oauth-callback")
@@ -96,23 +115,22 @@ def callback():
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
-    token_response = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
+    token_response = requests.post("httpsS://discord.com/api/oauth2/token", data=data, headers=headers)
     tokens = token_response.json()
 
     if "access_token" not in tokens:
         return "Error fetching access token.", 500
 
-    user_response = requests.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+    user_response = requests.get("httpsS://discord.com/api/users/@me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
     user = user_response.json()
     user_id = int(user["id"])
 
     store_discord_tokens(user_id, tokens)
     
-    was_role_granted = asyncio.run(push_role_metadata(user_id, tokens))
+    # UPDATED: Pass the 'user' object to the bot for logging
+    was_role_granted = asyncio.run(push_role_metadata(user_id, tokens, user))
 
     if was_role_granted:
-        # The user had a role and the badge was successfully granted
         return SUCCESS_HTML.format(username=user['username'])
     else:
-        # The user had no valid roles
         return FAILURE_HTML
