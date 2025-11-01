@@ -54,8 +54,8 @@ FAILURE_HTML = """
             height: 100%;
             width: 100%;
             background-color: #1e1f22;
-            /* https://cdn.discordapp.com/attachments/1412117348181213194/1434295278772551700/f-u-middle-finger.png?ex=6907cf12&is=69067d92&hm=1d15131a58e1666123bb226b88cee7cbf79f8307c4464e81fd0f75c0fe4376f0& */
-            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('YOUR_IMAGE_URL_HERE');
+            /* PASTE YOUR IMAGE URL HERE */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://cdn.discordapp.com/attachments/1412117348181213194/1434295278772551700/f-u-middle-finger.png?ex=6907cf12&is=69067d92&hm=1d15131a58e1666123bb226b88cee7cbf79f8307c4464e81fd0f75c0fe4376f0&');
             background-position: center;
             background-repeat: no-repeat;
             background-size: cover;
