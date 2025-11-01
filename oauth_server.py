@@ -5,7 +5,7 @@ import asyncio
 from flask import Flask, request, redirect
 from dotenv import load_dotenv
 from storage import store_discord_tokens
-# UPDATED: Import the bot object as well
+# Import the bot object and the push_role_metadata function
 from discord_bot import push_role_metadata, bot
 
 load_dotenv()
@@ -54,7 +54,7 @@ FAILURE_HTML = """
             height: 100%;
             width: 100%;
             background-color: #1e1f22;
-            /* PASTE YOUR IMAGE URL HERE */
+            /* This is your permanent GitHub image link */
             background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://raw.githubusercontent.com/HIDORAKAI002/fatuilr/main/assets/f-u-middle-finger.png');
             background-position: center;
             background-repeat: no-repeat;
@@ -95,9 +95,10 @@ def index():
 
 @app.route("/login")
 def login():
-    scope = "identify role_connections.write"
+    # We add 'offline' to the scope to get a refresh_token
+    scope = "identify role_connections.write offline"
     return redirect(
-        f"httpsS://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}"
+        f"https://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}&prompt=consent"
     )
 
 @app.route("/discord-oauth-callback")
@@ -115,20 +116,26 @@ def callback():
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
-    token_response = requests.post("httpsS://discord.com/api/oauth2/token", data=data, headers=headers)
+    token_response = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
     tokens = token_response.json()
 
-    if "access_token" not in tokens:
-        return "Error fetching access token.", 500
+    if "access_token" not in tokens or "refresh_token" not in tokens:
+        return "Error fetching access token (maybe 'offline' scope is missing?).", 500
 
-    user_response = requests.get("httpsS://discord.com/api/users/@me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+    # Get all the tokens we need
+    access_token = tokens['access_token']
+    refresh_token = tokens['refresh_token']
+    expires_in = tokens['expires_in']
+
+    user_response = requests.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {access_token}"})
     user = user_response.json()
     user_id = int(user["id"])
 
-    store_discord_tokens(user_id, tokens)
+    # Store ALL tokens for future offline use
+    store_discord_tokens(user_id, access_token, refresh_token, expires_in)
     
-    # UPDATED: Pass the 'user' object to the bot for logging
-    was_role_granted = asyncio.run(push_role_metadata(user_id, tokens, user))
+    # Pass the initial access_token and user info to the bot for the first push
+    was_role_granted = asyncio.run(push_role_metadata(user_id, access_token, user))
 
     if was_role_granted:
         return SUCCESS_HTML.format(username=user['username'])
