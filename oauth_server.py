@@ -5,7 +5,7 @@ import asyncio
 from flask import Flask, request, redirect
 from dotenv import load_dotenv
 from storage import store_discord_tokens
-# UPDATED: Import the bot object as well
+# Import the bot object and the push_role_metadata function
 from discord_bot import push_role_metadata, bot
 
 load_dotenv()
@@ -17,59 +17,7 @@ CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI")
 
-# --- HTML TEMPLATES ---
-
-SUCCESS_HTML = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Success!</title>
-    <style>
-        body { background-color: #2c2f33; color: #ffffff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; display: grid; place-items: center; min-height: 90vh; }
-        .container { background-color: #36393f; padding: 40px; border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); text-align: center; }
-        h1 { color: #4CAF50; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>✅ Success!</h1>
-        <p>Your roles have been linked, {username}.</p>
-        <p>You can now close this tab.</p>
-    </div>
-</body>
-</html>
-"""
-
-FAILURE_HTML = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Verification Failed</title>
-    <style>
-        body { background-color: #2c2f33; color: #ffffff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; display: grid; place-items: center; min-height: 90vh; }
-        .container { background-color: #36393f; padding: 40px; border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); text-align: center; }
-        h1 { color: #F44336; }
-        video { max-width: 100%; border-radius: 8px; margin-bottom: 20px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <video src="https://cdn.discordapp.com/attachments/1412117348181213194/1434288938998042684/cat-laughing-video-meme-download.mp4?ex=6907c92a&is=690677aa&hm=3f63516a45a2fc3904b08b83f63ad3195768e5332575e593b549e4bbff9385b9&>
-            Your browser does not support the video tag.
-        </video>
-        
-        <h1>❌ Verification Failed</h1>
-        <p>You dont have the roles lil bro.</p>
-        <p>Sybau and close this tab.</p>
-    </div>
-</body>
-</html>
-"""
-
 # --- END OF HTML TEMPLATES ---
-
 
 @app.route("/")
 def index():
@@ -120,6 +68,6 @@ def callback():
     was_role_granted = asyncio.run(push_role_metadata(user_id, access_token, user))
 
     if was_role_granted:
-        return SUCCESS_HTML.format(username=user['username'])
+        return f"✅ Success! Your roles have been linked, {user['username']}. You can now close this tab."
     else:
-        return FAILURE_HTML
+        return f"❌ Verification Failed. Sybau lil bro dont even try. You can close this tab and cry about it."
