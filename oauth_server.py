@@ -60,8 +60,8 @@ FAILURE_HTML = """
         </video>
         
         <h1>❌ Verification Failed</h1>
-        <p>You do not have the role (skill issue).</p>
-        <p>Don't even try lil bro.</p>
+        <p>You do not have any of the required roles in the server.</p>
+        <p>You can close this tab.</p>
     </div>
 </body>
 </html>
@@ -102,7 +102,10 @@ def callback():
     if "access_token" not in tokens:
         return "Error fetching access token.", 500
 
-    user_response = requests.get("https->discord.com/api/users/@me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+    # --- THIS IS THE CORRECTED LINE ---
+    user_response = requests.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+    # --- ---
+    
     user = user_response.json()
     user_id = int(user["id"])
 
