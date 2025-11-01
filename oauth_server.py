@@ -20,7 +20,7 @@ REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI")
 # --- HTML TEMPLATES ---
 # (I've removed the HTML to save space, but you can paste your plain-text or image HTML here)
 SUCCESS_HTML = "✅ Success! Your roles have been linked, {username}. You can now close this tab."
-FAILURE_HTML = "❌ Verification Failed. You do not have any of the required roles in the server. You can close this tab."
+FAILURE_HTML = "❌ Sybau lil bro you don't even ahve the role."
 
 # --- END OF HTML TEMPLATES ---
 
