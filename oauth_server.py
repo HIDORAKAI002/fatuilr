@@ -5,7 +5,7 @@ import asyncio
 from flask import Flask, request, redirect
 from dotenv import load_dotenv
 from storage import store_discord_tokens
-# Import the bot object and the push_role_metadata function
+# UPDATED: Import the bot object as well
 from discord_bot import push_role_metadata, bot
 
 load_dotenv()
@@ -48,39 +48,21 @@ FAILURE_HTML = """
     <meta charset="UTF-8">
     <title>Verification Failed</title>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            background-color: #1e1f22;
-            /* This is your permanent GitHub image link */
-            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://raw.githubusercontent.com/HIDORAKAI002/fatuilr/main/assets/f-u-middle-finger.png');
-            background-position: center;
-            background-repeat: no-repeat;
-            background-size: cover;
-            
-            /* Center the text container */
-            display: grid;
-            place-items: center;
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            color: #ffffff;
-        }
-        .container { 
-            background-color: rgba(44, 47, 51, 0.8); /* Semi-transparent container */
-            padding: 40px; 
-            border-radius: 10px; 
-            box-shadow: 0 4px 14px rgba(0,0,0,0.3); 
-            text-align: center; 
-        }
+        body { background-color: #2c2f33; color: #ffffff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; display: grid; place-items: center; min-height: 90vh; }
+        .container { background-color: #36393f; padding: 40px; border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); text-align: center; }
         h1 { color: #F44336; }
+        video { max-width: 100%; border-radius: 8px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
+        <video src="https://cdn.discordapp.com/attachments/1412117348181213194/1434288938998042684/cat-laughing-video-meme-download.mp4?ex=6907c92a&is=690677aa&hm=3f63516a45a2fc3904b08b83f63ad3195768e5332575e593b549e4bbff9385b9&>
+            Your browser does not support the video tag.
+        </video>
+        
         <h1>❌ Verification Failed</h1>
-        <p>You do not have any of the required roles in the server.</p>
-        <p>You can close this tab.</p>
+        <p>You dont have the roles lil bro.</p>
+        <p>Sybau and close this tab.</p>
     </div>
 </body>
 </html>
@@ -98,7 +80,7 @@ def login():
     # We add 'offline' to the scope to get a refresh_token
     scope = "identify role_connections.write offline"
     return redirect(
-        f"httpss://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}&prompt=consent"
+        f"https://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}&prompt=consent"
     )
 
 @app.route("/discord-oauth-callback")
@@ -116,7 +98,7 @@ def callback():
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
-    token_response = requests.post("httpss://discord.com/api/oauth2/token", data=data, headers=headers)
+    token_response = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
     tokens = token_response.json()
 
     if "access_token" not in tokens or "refresh_token" not in tokens:
@@ -127,7 +109,7 @@ def callback():
     refresh_token = tokens['refresh_token']
     expires_in = tokens['expires_in']
 
-    user_response = requests.get("httpss://discord.com/api/users/@me", headers={"Authorization": f"Bearer {access_token}"})
+    user_response = requests.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {access_token}"})
     user = user_response.json()
     user_id = int(user["id"])
 
