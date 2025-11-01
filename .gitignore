@@ -1,0 +1,8 @@
+# Local secrets file
+.env
+
+# User token storage
+tokens.json
+
+# Python cache files
+__pycache__/
