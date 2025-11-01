@@ -55,13 +55,13 @@ FAILURE_HTML = """
 </head>
 <body>
     <div class="container">
-        <video src="https://cdn.discordapp.com/attachments/1412117348181213194/1434288938998042684/cat-laughing-video-meme-download.mp4?ex=6907c92a&is=690677aa&hm=3f63516a45a2fc3904b08b83f63ad3195768e5332575e593b549e4bbff9385b9&" width="350" autoplay loop>
+        <video src="https://cdn.discordapp.com/attachments/1412117348181213194/1434288938998042684/cat-laughing-video-meme-download.mp4?ex=6907c92a&is=690677aa&hm=3f63516a45a2fc3904b08b83f63ad3195768e5332575e593b549e4bbff9385b9&" width="350" loop controls>
             Your browser does not support the video tag.
         </video>
         
         <h1>❌ Verification Failed</h1>
-        <p>You do not have any of the required roles in the server.</p>
-        <p>You can close this tab.</p>
+        <p>Sybau bro don't even try.</p>
+        <p>You can close this tab and cry about it.</p>
     </div>
 </body>
 </html>
@@ -102,10 +102,7 @@ def callback():
     if "access_token" not in tokens:
         return "Error fetching access token.", 500
 
-    # --- THIS IS THE CORRECTED LINE ---
     user_response = requests.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
-    # --- ---
-    
     user = user_response.json()
     user_id = int(user["id"])
 
