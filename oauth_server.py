@@ -32,6 +32,7 @@ def index():
 def login():
     # We add 'offline' to the scope to get a refresh_token
     scope = "identify role_connections.write offline"
+    # --- TYPO FIX IS HERE ---
     return redirect(
         f"https://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}&prompt=consent"
     )
@@ -51,6 +52,7 @@ def callback():
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     
+    # --- TYPO FIX IS HERE ---
     token_response = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
     tokens = token_response.json()
 
@@ -63,6 +65,7 @@ def callback():
     refresh_token = tokens['refresh_token']
     expires_in = tokens['expires_in']
 
+    # --- TYPO FIX IS HERE ---
     user_response = requests.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {access_token}"})
     user = user_response.json()
     user_id = int(user["id"])
