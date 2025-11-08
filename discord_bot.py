@@ -3,6 +3,8 @@ import os
 import discord
 import aiohttp
 import time
+import threading
+from flask import Flask
 from dotenv import load_dotenv
 from storage import get_discord_tokens, update_access_token
 
@@ -10,7 +12,7 @@ load_dotenv()
 
 # --- Load Config from .env ---
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-GUILD_ID = int(os.getenv("GUILD_ID")) 
+GUILD_ID = int(os.getenv("GUILD_ID"))
 CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
@@ -23,11 +25,11 @@ tree = discord.app_commands.CommandTree(bot)
 
 # ------------------- Roles Mapping -------------------
 ROLE_MAPPING = [
-    {"key": "has_founder",   "role_id": 1400496639680057407, "name": "Founder"},
-    {"key": "has_c_suit",    "role_id": 1432535953712615486, "name": "The C Suit"},
-    {"key": "has_nexus",     "role_id": 1432769935590818005, "name": "The Nexus"},
+    {"key": "has_founder", "role_id": 1400496639680057407, "name": "Founder"},
+    {"key": "has_c_suit", "role_id": 1432535953712615486, "name": "The C Suit"},
+    {"key": "has_nexus", "role_id": 1432769935590818005, "name": "The Nexus"},
     {"key": "has_as_suites", "role_id": 1433905673275703349, "name": "Assisting Suites"},
-    {"key": "has_as_nexus",  "role_id": 1434247577251090453, "name": "Assisting Nexus"},
+    {"key": "has_as_nexus", "role_id": 1434247577251090453, "name": "Assisting Nexus"},
 ]
 
 # ------------------- Metadata Schema -------------------
@@ -60,25 +62,25 @@ async def get_new_access_token(user_id: int) -> str | None:
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
         "grant_type": "refresh_token",
-        "refresh_token": tokens['refresh_token'],
+        "refresh_token": tokens["refresh_token"],
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     async with aiohttp.ClientSession() as session:
         async with session.post("https://discord.com/api/oauth2/token", data=data, headers=headers) as resp:
             if resp.status != 200:
-                print(f"Error refreshing token for user {user_id}: {await resp.text()}")
+                print(f"Error refreshing token for {user_id}: {await resp.text()}")
                 return None
-            
+
             new_tokens = await resp.json()
             update_access_token(
                 user_id,
-                new_tokens['access_token'],
-                new_tokens['refresh_token'],
-                new_tokens['expires_in']
+                new_tokens["access_token"],
+                new_tokens["refresh_token"],
+                new_tokens["expires_in"],
             )
-            print(f"Successfully refreshed token for user {user_id}")
-            return new_tokens['access_token']
+            print(f"Successfully refreshed token for {user_id}")
+            return new_tokens["access_token"]
 
 # --- Push Role Metadata ---
 async def push_metadata(user_id: int, access_token: str, metadata: dict):
@@ -103,8 +105,8 @@ async def update_roles_for_member(member: discord.Member):
     if not tokens:
         return
 
-    access_token = tokens['access_token']
-    if tokens['expires_at'] < (int(time.time()) + 60):
+    access_token = tokens["access_token"]
+    if tokens["expires_at"] < (int(time.time()) + 60):
         print(f"Token expired for {user_id}. Refreshing...")
         access_token = await get_new_access_token(user_id)
         if not access_token:
@@ -118,14 +120,14 @@ async def update_roles_for_member(member: discord.Member):
     user_full_name = f"{member.name}#{member.discriminator}"
     if not found_role:
         print(f"❌ {user_full_name} has no mapped roles.")
-        log_embed_color = discord.Color.red()
-        log_embed_title = "Linked Role Cleared (Auto)"
-        log_embed_desc = f"{user_full_name} (`{user_id}`) lost all linked roles."
+        color = discord.Color.red()
+        title = "Linked Role Cleared (Auto)"
+        desc = f"{user_full_name} (`{user_id}`) lost all linked roles."
     else:
         print(f"✅ Updating metadata for {user_full_name}: {metadata}")
-        log_embed_color = discord.Color.blue()
-        log_embed_title = "Linked Role Updated (Auto)"
-        log_embed_desc = f"{user_full_name} (`{user_id}`) roles updated."
+        color = discord.Color.blue()
+        title = "Linked Role Updated (Auto)"
+        desc = f"{user_full_name} (`{user_id}`) roles updated."
 
     status = await push_metadata(user_id, access_token, metadata)
     if status == "RETRY":
@@ -136,11 +138,11 @@ async def update_roles_for_member(member: discord.Member):
             status = "FAIL"
 
     if status == "FAIL":
-        log_embed_title = "Linked Role Update FAILED"
-        log_embed_desc = f"Failed to update roles for {user_full_name}."
-        log_embed_color = discord.Color.dark_red()
+        title = "Linked Role Update FAILED"
+        desc = f"Failed to update roles for {user_full_name}."
+        color = discord.Color.dark_red()
 
-    embed = discord.Embed(title=log_embed_title, description=log_embed_desc, color=log_embed_color)
+    embed = discord.Embed(title=title, description=desc, color=color)
     await log_to_discord(embed)
 
 # --- Initial Metadata Push from OAuth ---
@@ -167,7 +169,7 @@ async def push_role_metadata(user_id: int, access_token: str, user_info: dict) -
         embed = discord.Embed(
             title="Verification Failed (Manual)",
             description=f"{full_name} (`{user_id}`) had no eligible roles.",
-            color=discord.Color.red()
+            color=discord.Color.red(),
         )
         await log_to_discord(embed)
         return False
@@ -177,7 +179,7 @@ async def push_role_metadata(user_id: int, access_token: str, user_info: dict) -
         embed = discord.Embed(
             title="Verification Success (Manual)",
             description=f"{full_name} (`{user_id}`) successfully linked.",
-            color=discord.Color.green()
+            color=discord.Color.green(),
         )
         await log_to_discord(embed)
         return status == "SUCCESS"
@@ -231,6 +233,19 @@ async def unlink(interaction: discord.Interaction, user: discord.User):
 async def on_ready():
     await tree.sync()
     print(f"✅ Logged in as {bot.user} — slash commands synced.")
+
+# --- Keep-alive Web Server for Render ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Linked Role bot is online and running."
+
+def run_web():
+    port = int(os.getenv("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+threading.Thread(target=run_web).start()
 
 # --- Run the Bot ---
 bot.run(TOKEN)
