@@ -1,4 +1,3 @@
-# oauth_server.py
 import os
 import requests
 import asyncio
@@ -17,25 +16,32 @@ CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI")
 
-# --- HTML TEMPLATES ---
+# --- HTML Templates ---
 SUCCESS_HTML = "✅ Success! Your roles have been linked, {username}. You can now close this tab."
 FAILURE_HTML = "❌ Verification Failed. You do not have any of the required roles in the server. You can close this tab."
-
-# --- END OF HTML TEMPLATES ---
+# --- End of HTML Templates ---
 
 
 @app.route("/")
 def index():
     return "OAuth server is running. Use /login to link your role."
 
+
 @app.route("/login")
 def login():
-    # We add 'offline' to the scope to get a refresh_token
-    scope = "identify role_connections.write offline"
-    # --- TYPO FIX IS HERE ---
+    # ✅ Correct Discord OAuth2 Scopes for Linked Roles
+    scope = "identify guilds.members.read role_connections.write"
+
+    # ✅ Properly encoded redirect URI
     return redirect(
-        f"https://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope={scope}&prompt=consent"
+        f"https://discord.com/api/oauth2/authorize"
+        f"?client_id={CLIENT_ID}"
+        f"&redirect_uri={REDIRECT_URI}"
+        f"&response_type=code"
+        f"&scope={scope}"
+        f"&prompt=consent"
     )
+
 
 @app.route("/discord-oauth-callback")
 def callback():
@@ -51,32 +57,41 @@ def callback():
         "redirect_uri": REDIRECT_URI,
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    
-    # --- TYPO FIX IS HERE ---
+
+    # Exchange the authorization code for access and refresh tokens
     token_response = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
     tokens = token_response.json()
 
-    # We now require a refresh_token
-    if "access_token" not in tokens or "refresh_token" not in tokens:
-        return "Error fetching access token (maybe 'offline' scope is missing?).", 500
+    if "access_token" not in tokens:
+        return f"Error fetching access token: {tokens}", 500
 
-    # Get all the tokens we need
-    access_token = tokens['access_token']
-    refresh_token = tokens['refresh_token']
-    expires_in = tokens['expires_in']
+    access_token = tokens["access_token"]
+    refresh_token = tokens.get("refresh_token")
+    expires_in = tokens.get("expires_in")
 
-    # --- TYPO FIX IS HERE ---
-    user_response = requests.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {access_token}"})
+    # Fetch the user's info
+    user_response = requests.get(
+        "https://discord.com/api/users/@me",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
     user = user_response.json()
+
+    if "id" not in user:
+        return f"Error fetching user data: {user}", 500
+
     user_id = int(user["id"])
 
-    # Store ALL tokens for future offline use
+    # Store tokens for later use
     store_discord_tokens(user_id, access_token, refresh_token, expires_in)
-    
-    # Pass the initial access_token and user info to the bot for the first push
+
+    # Push Linked Role metadata immediately
     was_role_granted = asyncio.run(push_role_metadata(user_id, access_token, user))
 
     if was_role_granted:
-        return SUCCESS_HTML.format(username=user['username'])
+        return SUCCESS_HTML.format(username=user["username"])
     else:
         return FAILURE_HTML
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
