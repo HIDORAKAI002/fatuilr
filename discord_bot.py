@@ -4,7 +4,6 @@ import discord
 import aiohttp
 import time
 from dotenv import load_dotenv
-# Import our new storage functions
 from storage import get_discord_tokens, update_access_token
 
 load_dotenv()
@@ -13,13 +12,14 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID")) 
 CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
-CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET") # We need the secret to refresh tokens
+CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID"))
 
 # --- Bot Setup ---
 intents = discord.Intents.default()
-intents.members = True # REQUIRED
+intents.members = True
 bot = discord.Client(intents=intents)
+tree = discord.app_commands.CommandTree(bot)
 
 # ------------------- Roles Mapping -------------------
 ROLE_MAPPING = [
@@ -36,34 +36,24 @@ ROLE_METADATA = [
         "key": role["key"],
         "name": role["name"],
         "description": f"Has the {role['name']} role in the server",
-        "type": 7  # 7 = boolean_equal
+        "type": 7
     }
     for role in ROLE_MAPPING
 ]
 
-# --- NEW: Bot Event for Role Changes ---
+# --- Role Change Event ---
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
-    """
-    This event triggers automatically when a user's roles change.
-    """
-    # If the roles haven't changed, do nothing
     if before.roles == after.roles:
         return
-    
-    print(f"Role change detected for user {after.name}. Triggering update.")
-    # Call our new function to handle the update
+    print(f"Role change detected for user {after.name}.")
     await update_roles_for_member(after)
 
-
-# --- NEW: Function to Refresh Tokens ---
+# --- Refresh Access Tokens ---
 async def get_new_access_token(user_id: int) -> str | None:
-    """
-    Uses a refresh token to get a new access token from Discord.
-    """
     tokens = get_discord_tokens(user_id)
     if not tokens:
-        print(f"No tokens found for user {user_id} during refresh.")
+        print(f"No tokens found for user {user_id}.")
         return None
 
     data = {
@@ -90,175 +80,157 @@ async def get_new_access_token(user_id: int) -> str | None:
             print(f"Successfully refreshed token for user {user_id}")
             return new_tokens['access_token']
 
-# --- MODIFIED: Core Metadata Push Function ---
+# --- Push Role Metadata ---
 async def push_metadata(user_id: int, access_token: str, metadata: dict):
-    """
-    Pushes the metadata payload to Discord's API using a given access token.
-    """
     url = f"https://discord.com/api/v10/users/@me/applications/{CLIENT_ID}/role-connection"
     headers = {"Authorization": f"Bearer {access_token}"}
     payload = {"metadata": metadata}
 
     async with aiohttp.ClientSession() as session:
         async with session.put(url, headers=headers, json=payload) as resp:
-            print(f"Metadata push for user {user_id} returned status: {resp.status}")
+            print(f"Metadata push for user {user_id} returned {resp.status}")
             if resp.status == 401:
-                print(f"Got 401 for user {user_id}. Token may be invalid.")
                 return "RETRY"
             if resp.status != 200:
                 print(f"Error pushing metadata: {await resp.text()}")
                 return "FAIL"
             return "SUCCESS"
 
-# --- NEW: Main Function for Bot-side Updates ---
+# --- Update Roles Automatically ---
 async def update_roles_for_member(member: discord.Member):
-    """
-    Handles getting valid tokens and pushing updated role state.
-    """
     user_id = member.id
     tokens = get_discord_tokens(user_id)
-    
     if not tokens:
         return
 
     access_token = tokens['access_token']
-    
     if tokens['expires_at'] < (int(time.time()) + 60):
-        print(f"Token expired for user {user_id}. Refreshing...")
+        print(f"Token expired for {user_id}. Refreshing...")
         access_token = await get_new_access_token(user_id)
         if not access_token:
-            print(f"Failed to refresh token for {user_id}. Aborting update.")
+            print(f"Failed to refresh token for {user_id}.")
             return
 
-    member_roles = [role.id for role in member.roles]
-    metadata = {}
-    found_role = False
-
-    for role in ROLE_MAPPING:
-        if role["role_id"] in member_roles:
-            metadata[role["key"]] = 1
-            found_role = True
-        else:
-            metadata[role["key"]] = 0
+    member_roles = [r.id for r in member.roles]
+    metadata = {r["key"]: int(r["role_id"] in member_roles) for r in ROLE_MAPPING}
+    found_role = any(metadata.values())
 
     user_full_name = f"{member.name}#{member.discriminator}"
     if not found_role:
-        print(f"❌ User {user_full_name} has no mapped roles. Clearing any existing badge.")
+        print(f"❌ {user_full_name} has no mapped roles.")
         log_embed_color = discord.Color.red()
         log_embed_title = "Linked Role Cleared (Auto)"
-        log_embed_desc = f"User **{user_full_name}** (`{user_id}`) no longer has a required role."
+        log_embed_desc = f"{user_full_name} (`{user_id}`) lost all linked roles."
     else:
-        print(f"✅ Pushing metadata for user {user_full_name}: {metadata}")
+        print(f"✅ Updating metadata for {user_full_name}: {metadata}")
         log_embed_color = discord.Color.blue()
         log_embed_title = "Linked Role Updated (Auto)"
-        log_embed_desc = f"User **{user_full_name}** (`{user_id}`) roles changed."
+        log_embed_desc = f"{user_full_name} (`{user_id}`) roles updated."
 
     status = await push_metadata(user_id, access_token, metadata)
-    
     if status == "RETRY":
-        print(f"Token failed for {user_id}. Refreshing and retrying...")
         access_token = await get_new_access_token(user_id)
         if access_token:
             status = await push_metadata(user_id, access_token, metadata)
         else:
             status = "FAIL"
-            
+
     if status == "FAIL":
         log_embed_title = "Linked Role Update FAILED"
-        log_embed_desc = f"Failed to update roles for **{user_full_name}**."
+        log_embed_desc = f"Failed to update roles for {user_full_name}."
         log_embed_color = discord.Color.dark_red()
 
-    log_embed = discord.Embed(
-        title=log_embed_title,
-        description=log_embed_desc,
-        color=log_embed_color
-    )
-    await log_to_discord(log_embed)
+    embed = discord.Embed(title=log_embed_title, description=log_embed_desc, color=log_embed_color)
+    await log_to_discord(embed)
 
-# --- OLD: Function for Web Server (First Push) ---
+# --- Initial Metadata Push from OAuth ---
 async def push_role_metadata(user_id: int, access_token: str, user_info: dict) -> bool:
-    """
-    Called by oauth_server.py when a user first links.
-    """
     await bot.wait_until_ready()
     guild = bot.get_guild(GUILD_ID)
     member = guild.get_member(user_id) if guild else None
 
     if not member:
-        print(f"❌ User {user_id} is not in the guild.")
+        print(f"❌ {user_id} not found in guild.")
         return False
-        
-    member_roles = [role.id for role in member.roles]
-    metadata = {}
-    found_role = False
-    
-    username = user_info.get('username', 'UnknownUser')
-    user_discriminator = user_info.get('discriminator', '0000')
-    user_full_name = f"{username}#{user_discriminator}"
 
-    for role in ROLE_MAPPING:
-        if role["role_id"] in member_roles:
-            metadata[role["key"]] = 1
-            found_role = True
-        else:
-            metadata[role["key"]] = 0
+    member_roles = [r.id for r in member.roles]
+    metadata = {r["key"]: int(r["role_id"] in member_roles) for r in ROLE_MAPPING}
+    found_role = any(metadata.values())
+
+    username = user_info.get("username", "UnknownUser")
+    discrim = user_info.get("discriminator", "0000")
+    full_name = f"{username}#{discrim}"
 
     if not found_role:
-        print(f"❌ User {user_full_name} has no mapped roles.")
+        print(f"❌ {full_name} has no mapped roles.")
         await push_metadata(user_id, access_token, {})
-        
-        log_embed = discord.Embed(
+        embed = discord.Embed(
             title="Verification Failed (Manual)",
-            description=f"User **{user_full_name}** (`{user_id}`) had no required roles.",
+            description=f"{full_name} (`{user_id}`) had no eligible roles.",
             color=discord.Color.red()
         )
-        await log_to_discord(log_embed)
+        await log_to_discord(embed)
         return False
     else:
-        print(f"✅ Pushing metadata for user {user_full_name}: {metadata}")
+        print(f"✅ Linking roles for {full_name}: {metadata}")
         status = await push_metadata(user_id, access_token, metadata)
-        
-        log_embed = discord.Embed(
+        embed = discord.Embed(
             title="Verification Success (Manual)",
-            description=f"User **{user_full_name}** (`{user_id}`) successfully linked.",
+            description=f"{full_name} (`{user_id}`) successfully linked.",
             color=discord.Color.green()
         )
-        await log_to_discord(log_embed)
+        await log_to_discord(embed)
         return status == "SUCCESS"
 
-# --- NEW: Function to Remove Linked Role Connection ---
+# --- Remove Linked Role Connection ---
 async def remove_role_metadata(user_id: int, access_token: str):
-    """
-    Clears a user's Linked Role connection on Discord (unlinks them).
-    """
     import requests
     url = f"https://discord.com/api/v10/users/@me/applications/{CLIENT_ID}/role-connection"
     headers = {"Authorization": f"Bearer {access_token}"}
-    data = {
-        "platform_name": None,
-        "platform_username": None,
-        "metadata": {}
-    }
-
+    data = {"platform_name": None, "platform_username": None, "metadata": {}}
     response = requests.put(url, headers=headers, json=data)
     if response.status_code == 200:
-        print(f"[LinkedRoles] Successfully unlinked user {user_id}")
+        print(f"[LinkedRoles] Successfully unlinked {user_id}")
         return True
     else:
         print(f"[LinkedRoles] Failed to unlink {user_id}: {response.text}")
         return False
 
-
-# --- Logging Function ---
-async def log_to_discord(message_embed):
-    """Sends a log message to the specified channel."""
+# --- Log Function ---
+async def log_to_discord(embed):
     try:
         await bot.wait_until_ready()
         channel = bot.get_channel(LOG_CHANNEL_ID)
-        
         if channel:
-            await channel.send(embed=message_embed)
+            await channel.send(embed=embed)
         else:
             print(f"Error: Log channel {LOG_CHANNEL_ID} not found.")
     except Exception as e:
-        print(f"Error logging to Discord: {e}")
+        print(f"Error logging: {e}")
+
+# --- /unlink Command ---
+@tree.command(name="unlink", description="Force-remove a user's Linked Role connection.")
+@discord.app_commands.checks.has_permissions(manage_roles=True)
+async def unlink(interaction: discord.Interaction, user: discord.User):
+    await interaction.response.defer(ephemeral=True)
+    tokens = get_discord_tokens(user.id)
+    if not tokens or "access_token" not in tokens:
+        await interaction.followup.send(f"⚠️ No linked data found for {user.mention}.", ephemeral=True)
+        return
+
+    access_token = tokens["access_token"]
+    success = await remove_role_metadata(user.id, access_token)
+
+    if success:
+        await interaction.followup.send(f"✅ Successfully unlinked **{user.name}** from Linked Roles.", ephemeral=True)
+    else:
+        await interaction.followup.send(f"❌ Failed to unlink **{user.name}**. Please try again or reauthorize them.", ephemeral=True)
+
+# --- Bot Ready Event ---
+@bot.event
+async def on_ready():
+    await tree.sync()
+    print(f"✅ Logged in as {bot.user} — slash commands synced.")
+
+# --- Run the Bot ---
+bot.run(TOKEN)
